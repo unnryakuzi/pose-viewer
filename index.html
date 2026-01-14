@@ -7,6 +7,20 @@
     <link rel="shortcut icon" href="TemplateData/favicon.ico">
     <link rel="stylesheet" href="TemplateData/style.css">
   </head>
+  
+<div style="position: fixed; top: 10px; left: 10px; background: #ffffffcc; padding: 10px; border-radius: 8px;">
+  <input id="counter" type="text" value="0" style="width:60px; text-align:center;">
+  <button onclick="addOne()">+1</button>
+</div>
+
+<script>
+function addOne() {
+  const box = document.getElementById("counter");
+  let v = parseInt(box.value || "0", 10);
+  box.value = v + 1;
+}
+</script>
+
   <body>
     <div id="unity-container" class="unity-desktop">
       <canvas id="unity-canvas" width=960 height=600 tabindex="-1"></canvas>
