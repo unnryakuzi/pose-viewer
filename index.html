@@ -1,147 +1,196 @@
+<!-- DEBUG: 2026-01-16 23:10 編集版 -->
 <!DOCTYPE html>
-<html lang="en-us">
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Unity Web Player | MediaPipeStillImage2</title>
-    <link rel="shortcut icon" href="TemplateData/favicon.ico">
-    <link rel="stylesheet" href="TemplateData/style.css">
-  </head>
-  
-<div style="position: fixed; top: 10px; left: 10px; background: #ffffffcc; padding: 10px; border-radius: 8px;">
-  <input id="counter" type="text" value="0" style="width:60px; text-align:center;">
-  <button onclick="addOne()">+1</button>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>MediaPipe → JSON → Unity</title>
+  <link rel="shortcut icon" href="TemplateData/favicon.ico" />
+  <link rel="stylesheet" href="TemplateData/style.css" />
+  <style>
+    body { font-family: sans-serif; margin: 16px; }
+    #controls { margin-bottom: 12px; }
+    canvas.mediapipe { border: 1px solid #ccc; max-width: 100%; }
+  </style>
+</head>
+
+<body>
+<h1>MediaPipe → JSON → Unity</h1>
+
+<!-- ===== 操作UI ===== -->
+<div id="controls">
+  <input type="file" id="imageInput" accept="image/*" />
+  <button id="detectBtn">検出</button>
+  <button id="sendBtn" disabled>Unityへ送信</button>
 </div>
 
+<canvas id="mp-canvas" class="mediapipe"></canvas>
+<hr />
+
+<!-- ===== Unity 表示領域 ===== -->
+<div id="unity-container" class="unity-desktop">
+  <canvas id="unity-canvas" width="960" height="600" tabindex="-1"></canvas>
+  <div id="unity-loading-bar">
+    <div id="unity-logo"></div>
+    <div id="unity-progress-bar-empty">
+      <div id="unity-progress-bar-full"></div>
+    </div>
+  </div>
+  <div id="unity-warning"></div>
+  <div id="unity-footer">
+    <div id="unity-logo-title-footer"></div>
+    <div id="unity-fullscreen-button"></div>
+    <div id="unity-build-title">MediaPipeStillImage2</div>
+  </div>
+</div>
+
+<!-- ===== Unity ローダー ===== -->
 <script>
-function addOne() {
-  const box = document.getElementById("counter");
-  let v = parseInt(box.value || "0", 10);
-  box.value = v + 1;
+const unityCanvas = document.querySelector("#unity-canvas");
+
+function unityShowBanner(msg, type) {
+  const warningBanner = document.querySelector("#unity-warning");
+  const div = document.createElement("div");
+  div.innerHTML = msg;
+  warningBanner.appendChild(div);
+  if (type === "error") div.style = "background:red;padding:10px;";
+  if (type === "warning") div.style = "background:yellow;padding:10px;";
 }
+
+const buildUrl = "Build";
+const loaderUrl = buildUrl + "/pose-viewer.loader.js";
+const config = {
+  dataUrl: buildUrl + "/pose-viewer.data.unityweb",
+  frameworkUrl: buildUrl + "/pose-viewer.framework.js.unityweb",
+  codeUrl: buildUrl + "/pose-viewer.wasm.unityweb",
+  streamingAssetsUrl: "StreamingAssets",
+  companyName: "DefaultCompany",
+  productName: "MediaPipeStillImage2",
+  productVersion: "0.1.0",
+  showBanner: unityShowBanner,
+};
+
+document.querySelector("#unity-loading-bar").style.display = "block";
+
+const script = document.createElement("script");
+script.src = loaderUrl;
+script.onload = () => {
+  createUnityInstance(unityCanvas, config, (progress) => {
+    document.querySelector("#unity-progress-bar-full").style.width = (100 * progress) + "%";
+  }).then((unityInstance) => {
+    window.unityInstance = unityInstance;
+    document.querySelector("#unity-loading-bar").style.display = "none";
+    document.querySelector("#unity-fullscreen-button").onclick = () => {
+      unityInstance.SetFullscreen(1);
+    };
+    console.log("Unity 起動完了");
+  }).catch(alert);
+};
+document.body.appendChild(script);
 </script>
 
-  <body>
-    <div id="unity-container" class="unity-desktop">
-      <canvas id="unity-canvas" width=960 height=600 tabindex="-1"></canvas>
-      <div id="unity-loading-bar">
-        <div id="unity-logo"></div>
-        <div id="unity-progress-bar-empty">
-          <div id="unity-progress-bar-full"></div>
-        </div>
-      </div>
-      <div id="unity-warning"> </div>
-      <div id="unity-footer">
-        <div id="unity-logo-title-footer"></div>
-        <div id="unity-fullscreen-button"></div>
-        <div id="unity-build-title">MediaPipeStillImage2</div>
-      </div>
-    </div>
-    <script>
-      var canvas = document.querySelector("#unity-canvas");
+<!-- ===== MediaPipe 部分 ===== -->
+<script type="module">
+import { PoseLandmarker, FilesetResolver, DrawingUtils }
+  from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
 
-      // Shows a temporary message banner/ribbon for a few seconds, or
-      // a permanent error message on top of the canvas if type=='error'.
-      // If type=='warning', a yellow highlight color is used.
-      // Modify or remove this function to customize the visually presented
-      // way that non-critical warnings and error messages are presented to the
-      // user.
-      function unityShowBanner(msg, type) {
-        var warningBanner = document.querySelector("#unity-warning");
-        function updateBannerVisibility() {
-          warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
-        }
-        var div = document.createElement('div');
-        div.innerHTML = msg;
-        warningBanner.appendChild(div);
-        if (type == 'error') div.style = 'background: red; padding: 10px;';
-        else {
-          if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
-          setTimeout(function() {
-            warningBanner.removeChild(div);
-            updateBannerVisibility();
-          }, 5000);
-        }
-        updateBannerVisibility();
-      }
+const canvas = document.getElementById("mp-canvas");
+const ctx = canvas.getContext("2d");
+const imageInput = document.getElementById("imageInput");
+const detectBtn = document.getElementById("detectBtn");
+const sendBtn = document.getElementById("sendBtn");
 
-      var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/pose-viewer.loader.js";
-      var config = {
-        arguments: [],
-        dataUrl: buildUrl + "/pose-viewer.data.unityweb",
-        frameworkUrl: buildUrl + "/pose-viewer.framework.js.unityweb",
-        codeUrl: buildUrl + "/pose-viewer.wasm.unityweb",
-        streamingAssetsUrl: "StreamingAssets",
-        companyName: "DefaultCompany",
-        productName: "MediaPipeStillImage2",
-        productVersion: "0.1.0",
-        showBanner: unityShowBanner,
-        // errorHandler: function(err, url, line) {
-        //    alert("error " + err + " occurred at line " + line);
-        //    // Return 'true' if you handled this error and don't want Unity
-        //    // to process it further, 'false' otherwise.
-        //    return true;
-        // },
-      };
+let poseLandmarker;
+let lastResult = null;
+let loadedImage = null;
 
-      // By default, Unity keeps WebGL canvas render target size matched with
-      // the DOM size of the canvas element (scaled by window.devicePixelRatio)
-      // Set this to false if you want to decouple this synchronization from
-      // happening inside the engine, and you would instead like to size up
-      // the canvas DOM size and WebGL render target sizes yourself.
-      // config.matchWebGLToCanvasSize = false;
+/* 初期化 */
+const vision = await FilesetResolver.forVisionTasks(
+  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
+);
 
-      // If you would like all file writes inside Unity Application.persistentDataPath
-      // directory to automatically persist so that the contents are remembered when
-      // the user revisits the site the next time, uncomment the following line:
-      // config.autoSyncPersistentDataPath = true;
-      // This autosyncing is currently not the default behavior to avoid regressing
-      // existing user projects that might rely on the earlier manual
-      // JS_FileSystem_Sync() behavior, but in future Unity version, this will be
-      // expected to change.
+poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+  baseOptions: {
+    modelAssetPath:
+      "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+    delegate: "GPU"
+  },
+  runningMode: "IMAGE",
+  numPoses: 1
+});
 
-      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        // Mobile device style: fill the whole browser client area with the game canvas:
+/* 画像読み込み */
+imageInput.addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const img = new Image();
+  img.onload = () => {
+    loadedImage = img;
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    ctx.drawImage(img, 0, 0);
+  };
+  img.src = URL.createObjectURL(file);
+});
 
-        var meta = document.createElement('meta');
-        meta.name = 'viewport';
-        meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
-        document.getElementsByTagName('head')[0].appendChild(meta);
-        document.querySelector("#unity-container").className = "unity-mobile";
-        canvas.className = "unity-mobile";
+/* 検出 */
+detectBtn.addEventListener("click", async () => {
+  if (!loadedImage) {
+    alert("画像を選択してください");
+    return;
+  }
+  const result = await poseLandmarker.detect(loadedImage);
+  lastResult = result;
 
-        // To lower canvas resolution on mobile devices to gain some
-        // performance, uncomment the following line:
-        // config.devicePixelRatio = 1;
+  ctx.drawImage(loadedImage, 0, 0, canvas.width, canvas.height);
+  const draw = new DrawingUtils(ctx);
+  for (const lm of result.landmarks) {
+    draw.drawLandmarks(lm);
+    draw.drawConnectors(lm, PoseLandmarker.POSE_CONNECTIONS);
+  }
+  sendBtn.disabled = false;
+});
 
+/* Unity送信 + JSON保存 */
+sendBtn.addEventListener("click", () => {
+  console.log("send button clicked");
+  if (!lastResult) return;
 
-      } else {
-        // Desktop style: Render the game canvas in a window that can be maximized to fullscreen:
-        canvas.style.width = "960px";
-        canvas.style.height = "600px";
-      }
+  const json = JSON.stringify(lastResult, null, 2);
+  downloadJson(json);
 
-      document.querySelector("#unity-loading-bar").style.display = "block";
+  if (!window.unityInstance) {
+    alert("Unityがまだ起動していません");
+    return;
+  }
 
-      var script = document.createElement("script");
-      script.src = loaderUrl;
-      script.onload = () => {
-        createUnityInstance(canvas, config, (progress) => {
-          document.querySelector("#unity-progress-bar-full").style.width = 100 * progress + "%";
-              }).then((unityInstance) => {
-                document.querySelector("#unity-loading-bar").style.display = "none";
-                document.querySelector("#unity-fullscreen-button").onclick = () => {
-                  unityInstance.SetFullscreen(1);
-                };
+  window.unityInstance.SendMessage(
+    "PoseBootstrap",
+    "LoadPoseFromJson",
+    json
+  );
+});
 
-              }).catch((message) => {
-                alert(message);
-              });
-            };
-
-      document.body.appendChild(script);
-
-    </script>
-  </body>
+/* JSONダウンロード */
+function downloadJson(text) {
+  const blob = new Blob([text], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const now = new Date();
+  a.download =
+    "pose_" +
+    now.getFullYear() +
+    ("0" + (now.getMonth()+1)).slice(-2) +
+    ("0" + now.getDate()).slice(-2) + "_" +
+    ("0" + now.getHours()).slice(-2) +
+    ("0" + now.getMinutes()).slice(-2) +
+    ("0" + now.getSeconds()).slice(-2) +
+    ".json";
+  a.href = url;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+</script>
+</body>
 </html>

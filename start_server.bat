@@ -8,6 +8,9 @@ echo.
 echo ==========================================
 echo  Local Unity WebGL Server Started
 echo.
+echo  Server Root Directory:
+echo      %cd%
+echo.
 echo  Open this in your browser:
 echo      %URL%
 echo.
@@ -15,7 +18,7 @@ echo  Press Ctrl+C to stop the server.
 echo ==========================================
 echo.
 
-REM ブラウザを自動で開く（不要ならこの行は削除）
+REM ブラウザを自動で開く
 start "" "%URL%"
 
 python -m http.server %PORT%
