@@ -18,8 +18,8 @@
 <!-- ===== 操作UI ===== -->
 <div id="controls">
   <input type="file" id="imageInput" accept="image/*" />
-  <button id="detectBtn">検☆出</button>
-  <button id="sendBtn" disabled>Unityへ送信1</button>
+  <button id="detectBtn">検出</button>
+  <button id="sendBtn" disabled>Unityへ送信</button>
 </div>
 
 <canvas id="mp-canvas" class="mediapipe"></canvas>
@@ -137,15 +137,36 @@ detectBtn.addEventListener("click", async () => {
     alert("画像を選択してください");
     return;
   }
-  const result = await poseLandmarker.detect(loadedImage);
-  lastResult = result;
 
+  const result = await poseLandmarker.detect(loadedImage);
+
+  // ==== Python互換フォーマットに変換 ====
+  const poseFrame = { landmarks: [] };
+
+  if (result.landmarks && result.landmarks.length > 0) {
+    const firstPerson = result.landmarks[0];
+    for (const lm of firstPerson) {
+      poseFrame.landmarks.push({
+        x: lm.x,
+        y: lm.y,
+        z: lm.z,
+        visibility: lm.visibility ?? 1.0
+      });
+    }
+  }
+
+  lastResult = poseFrame;
+
+  // ==== 描画（従来通り） ====
   ctx.drawImage(loadedImage, 0, 0, canvas.width, canvas.height);
   const draw = new DrawingUtils(ctx);
-  for (const lm of result.landmarks) {
-    draw.drawLandmarks(lm);
-    draw.drawConnectors(lm, PoseLandmarker.POSE_CONNECTIONS);
+  if (result.landmarks) {
+    for (const lm of result.landmarks) {
+      draw.drawLandmarks(lm);
+      draw.drawConnectors(lm, PoseLandmarker.POSE_CONNECTIONS);
+    }
   }
+
   sendBtn.disabled = false;
 });
 
@@ -155,7 +176,7 @@ sendBtn.addEventListener("click", () => {
   if (!lastResult) return;
 
   const json = JSON.stringify(lastResult, null, 2);
-  downloadJson(json);
+  /*downloadJson(json);　*/ 
 
   if (!window.unityInstance) {
     alert("Unityがまだ起動していません");
