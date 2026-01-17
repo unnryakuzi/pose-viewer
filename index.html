@@ -7,8 +7,30 @@
   <link rel="stylesheet" href="TemplateData/style.css" />
   <style>
     body { font-family: sans-serif; margin: 16px; }
+
     #controls { margin-bottom: 12px; }
-    canvas.mediapipe { border: 1px solid #ccc; max-width: 100%; }
+
+    canvas.mediapipe {
+      border: 1px solid #ccc;
+      max-width: 100%;
+      display: block;
+      margin-bottom: 16px;
+    }
+
+    /* 念のための上書き */
+    #unity-container {
+      position: relative !important;
+      transform: none !important;
+      left: auto !important;
+      top: auto !important;
+      margin-top: 16px;
+    }
+
+    #unity-canvas {
+      position: static !important;
+      display: block;
+      margin: 0 auto;
+    }
   </style>
 </head>
 
