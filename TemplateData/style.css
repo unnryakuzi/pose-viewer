@@ -16,8 +16,13 @@ body { padding: 0; margin: 16px }   /* 余白を戻す */
   margin: 0 auto;
 }
 
-#unity-canvas {
+/* #unity-canvas {
   position: static;
   display: block;
   margin: 0 auto;
+} */
+
+#unity-canvas {
+  width: 960px !important;
+  height: 600px !important;
 }
