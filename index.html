@@ -55,13 +55,13 @@
   const unityCanvas = document.querySelector("#unity-canvas");
   const buildUrl = "Build";
   const config = {
-    dataUrl: buildUrl + "/pose-viewer.data.unityweb",
-    frameworkUrl: buildUrl + "/pose-viewer.framework.js.unityweb",
-    codeUrl: buildUrl + "/pose-viewer.wasm.unityweb",
+    dataUrl: "Build/pose-viewer.data",
+    frameworkUrl: "Build/pose-viewer.framework.js",
+    codeUrl: "Build/pose-viewer.wasm",
     streamingAssetsUrl: "StreamingAssets",
     companyName: "DefaultCompany",
-    productName: "MediaPipeStillImage2",
-    productVersion: "0.1.0",
+    productName: "pose-viewer",
+    productVersion: "0.1",
   };
 
   let unityInstance = null;
