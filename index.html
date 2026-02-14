@@ -10,7 +10,15 @@
     #controls { margin-bottom: 12px; padding: 10px; background: #f8f9fa; border-radius: 8px; border: 1px solid #ddd; }
     .control-group { margin: 10px 0; padding: 5px; }
     .section-title { font-weight: bold; display: block; border-bottom: 1px solid #ccc; margin-bottom: 8px; color: #333; }
-    canvas.mediapipe { border: 1px solid #ccc; max-width: 100%; display: block; margin-bottom: 16px; }
+    canvas.mediapipe {
+      border: 1px solid #ccc;
+      display: block;
+      margin-bottom: 16px;
+      /* 追加: 最大サイズを制限（例: 高さ500pxまで） */
+      max-width: 100%;
+      max-height: 500px; 
+      object-fit: contain; /* アスペクト比を維持して収める */
+    }
     #unity-container { position: relative !important; margin-top: 16px; }
     #unity-canvas { display: block; margin: 0 auto; width: 960px; height: 600px; }
   </style>
@@ -140,36 +148,74 @@
   }
   initMediaPipe();
 
+  // index.html の <script type="module"> 内の imageInput.addEventListener を修正
   imageInput.addEventListener("change", e => {
     const file = e.target.files[0];
     if (!file) return;
     const img = new Image();
     img.onload = () => {
       loadedImage = img;
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      ctx.drawImage(img, 0, 0);
+
+      // --- リサイズロジック ---
+      const MAX_SIZE = 800; // キャンバスの最大解像度（これ以上大きい場合は縮小）
+      let width = img.naturalWidth;
+      let height = img.naturalHeight;
+
+      if (width > height) {
+        if (width > MAX_SIZE) {
+          height *= MAX_SIZE / width;
+          width = MAX_SIZE;
+        }
+      } else {
+        if (height > MAX_SIZE) {
+          width *= MAX_SIZE / height;
+          height = MAX_SIZE;
+        }
+      }
+
+      // キャンバスの内部解像度を設定
+      canvas.width = width;
+      canvas.height = height;
+
+      // キャンバスに描画（縮小されて描画される）
+      ctx.drawImage(img, 0, 0, width, height);
     };
     img.src = URL.createObjectURL(file);
   });
 
+  // index.html の <script type="module"> 内の detectBtn 処理を確認
+
   detectBtn.addEventListener("click", async () => {
-    if (!poseLandmarker || !loadedImage) return;
-    const result = await poseLandmarker.detect(loadedImage);
-    const poseFrame = { landmarks: [] };
-    if (result.landmarks && result.landmarks[0]) {
-      result.landmarks[0].forEach(lm => {
-        poseFrame.landmarks.push({ x: lm.x, y: lm.y, z: lm.z, visibility: lm.visibility ?? 1.0 });
+      if (!poseLandmarker || !loadedImage) return;
+      
+      const result = await poseLandmarker.detect(loadedImage);
+
+      // --- 【重要】検出結果を lastResult に保存する処理を復元 ---
+      const poseFrame = { landmarks: [] };
+      if (result.landmarks && result.landmarks[0]) {
+        result.landmarks[0].forEach(lm => {
+          poseFrame.landmarks.push({ 
+            x: lm.x, 
+            y: lm.y, 
+            z: lm.z, 
+            visibility: lm.visibility ?? 1.0 
+          });
+        });
+      }
+      lastResult = poseFrame;
+      
+      // キャンバスをクリアして再描画
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(loadedImage, 0, 0, canvas.width, canvas.height);
+
+      // ポーズの描画
+      const draw = new DrawingUtils(ctx);
+      result.landmarks?.forEach(lm => {
+        draw.drawLandmarks(lm);
+        draw.drawConnectors(lm, PoseLandmarker.POSE_CONNECTIONS);
       });
-    }
-    lastResult = poseFrame;
-    ctx.drawImage(loadedImage, 0, 0);
-    const draw = new DrawingUtils(ctx);
-    result.landmarks?.forEach(lm => {
-      draw.drawLandmarks(lm);
-      draw.drawConnectors(lm, PoseLandmarker.POSE_CONNECTIONS);
-    });
-    sendBtn.disabled = false;
+      
+      sendBtn.disabled = false;
   });
 
   sendBtn.addEventListener("click", () => {
