@@ -32,6 +32,11 @@
     <input type="file" id="jsonLoadInput" accept=".json" />
     <button id="manualLoadBtn">JSONを反映</button>
   </div>
+
+  <div class="control-group" style="margin-top: 15px; background: #eef9ff; border: 1px solid #b2d7ff; padding: 10px;">
+    <span class="section-title">3. Unity上のポーズを保存</span>
+    <button id="savePoseBtn">現在のポーズをJSONでダウンロード</button>
+  </div>
 </div>
 
 <canvas id="mp-canvas" class="mediapipe"></canvas>
@@ -92,6 +97,16 @@
       }
     };
     reader.readAsText(file);
+  });
+
+  // index.html の script タグ内に追加
+  document.getElementById("savePoseBtn").addEventListener("click", () => {
+    if (window.unityInstance) {
+      // PoseBootstrap オブジェクトの RequestSavePose 関数を呼び出す
+      window.unityInstance.SendMessage("PoseBootstrap", "RequestSavePose");
+    } else {
+      alert("Unityがまだ起動していないか、インスタンスが見つかりません。");
+    }
   });
 </script>
 
