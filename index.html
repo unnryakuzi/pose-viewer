@@ -140,7 +140,8 @@
     );
     poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
       baseOptions: {
-        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+        // initMediaPipe 関数内の modelAssetPath を変更
+modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task",
         delegate: "GPU"
       },
       runningMode: "IMAGE"
@@ -186,36 +187,43 @@
   // index.html の <script type="module"> 内の detectBtn 処理を確認
 
   detectBtn.addEventListener("click", async () => {
-      if (!poseLandmarker || !loadedImage) return;
-      
-      const result = await poseLandmarker.detect(loadedImage);
+    if (!poseLandmarker || !loadedImage) return;
 
-      // --- 【重要】検出結果を lastResult に保存する処理を復元 ---
-      const poseFrame = { landmarks: [] };
-      if (result.landmarks && result.landmarks[0]) {
-        result.landmarks[0].forEach(lm => {
-          poseFrame.landmarks.push({ 
-            x: lm.x, 
-            y: lm.y, 
-            z: lm.z, 
-            visibility: lm.visibility ?? 1.0 
-          });
+    const result = await poseLandmarker.detect(loadedImage);
+
+    // --- 【変更点】worldLandmarks を優先的に使用 ---
+    // worldLandmarks がない場合（モデルがLiteなど）は通常の landmarks を使う
+    const sourceLandmarks = (result.worldLandmarks && result.worldLandmarks.length > 0)
+                            ? result.worldLandmarks[0]
+                            : result.landmarks[0];
+
+    const poseFrame = { landmarks: [] };
+    
+    if (sourceLandmarks) {
+      sourceLandmarks.forEach(lm => {
+        poseFrame.landmarks.push({ 
+          x: lm.x, 
+          y: lm.y, 
+          z: lm.z, 
+          visibility: lm.visibility ?? 1.0 
         });
-      }
-      lastResult = poseFrame;
-      
-      // キャンバスをクリアして再描画
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(loadedImage, 0, 0, canvas.width, canvas.height);
-
-      // ポーズの描画
-      const draw = new DrawingUtils(ctx);
-      result.landmarks?.forEach(lm => {
-        draw.drawLandmarks(lm);
-        draw.drawConnectors(lm, PoseLandmarker.POSE_CONNECTIONS);
       });
-      
-      sendBtn.disabled = false;
+    }
+    lastResult = poseFrame; 
+    // -----------------------------------------------------
+
+    // キャンバス描画（ここは描画ようなので通常の landmarks を使うのが正解）
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(loadedImage, 0, 0, canvas.width, canvas.height);
+
+    const draw = new DrawingUtils(ctx);
+    // 描画は2D画面に合わせるため、引き続き result.landmarks を使用します
+    result.landmarks?.forEach(lm => {
+      draw.drawLandmarks(lm);
+      draw.drawConnectors(lm, PoseLandmarker.POSE_CONNECTIONS);
+    });
+
+    sendBtn.disabled = false;
   });
 
   sendBtn.addEventListener("click", () => {
